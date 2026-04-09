@@ -87,7 +87,7 @@ def start_shift():
                 "created_at": now,
                 "updated_at": now,
                 "carried_over": True,
-                "carried_over_from": prev_shift.get("on_call_person", ""),
+                "carried_over_from": task.get("carried_over_from") or prev_shift.get("on_call_person", ""),
             })
 
     shift["_id"] = str(new_shift_id)

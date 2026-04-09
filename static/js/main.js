@@ -29,6 +29,14 @@ async function boot() {
   await loadTimeline();
   await refreshTasks();
   initSortable();
+  // Restore handover banner from the most recent ended shift (survives page reload)
+  if (activeShift) {
+    const res = await fetch("/api/shifts");
+    const ended = await res.json();
+    if (ended.length && ended[0].end_handover_notes) {
+      renderHandoverBanner(ended[0].on_call_person, ended[0].end_handover_notes);
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -36,7 +44,7 @@ async function boot() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function initTheme() {
-  const saved = localStorage.getItem("slick-theme") || "light";
+  const saved = localStorage.getItem("slick-theme") || "dark";
   applyTheme(saved);
 }
 
@@ -59,6 +67,8 @@ function applyTheme(mode) {
       .forEach(el => el.style.colorScheme = "light");
   }
   localStorage.setItem("slick-theme", mode);
+  // Repaint banner so its inline colors reflect the new theme
+  if (bannerData) _paintBanner();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -201,22 +211,32 @@ function _paintBanner() {
   const el = document.getElementById("handover-banner");
   if (!bannerData) { el.style.display = "none"; el.innerHTML = ""; return; }
 
+  const isDark = document.documentElement.classList.contains("dark");
+  const labelColor  = isDark ? "#fbbf24" : "#92400e";
+  const textColor   = isDark ? "#fde68a" : "#78350f";
+  const btnColor    = isDark ? "#fbbf24" : "#92400e";
+  const border      = isDark ? "#92400e"           : "#d97706";
+  const bg          = isDark ? "rgba(120,53,15,0.15)" : "rgba(251,191,36,0.12)";
+  const hiddenLabel = isDark ? "#a57f00" : "#78350f";
+  const hiddenBg    = isDark ? "rgba(120,90,0,0.08)" : "rgba(251,191,36,0.07)";
+  const hiddenBorder= isDark ? "rgba(161,132,0,0.3)" : "rgba(180,120,0,0.25)";
+
   if (bannerHidden) {
-    el.style.cssText = "margin:12px 24px 0; border-radius:10px; padding:8px 16px; display:flex; align-items:center; justify-content:space-between; border:1px solid rgba(161,132,0,0.3); background:rgba(120,90,0,0.08)";
+    el.style.cssText = `margin:12px 24px 0; border-radius:10px; padding:8px 16px; display:flex; align-items:center; justify-content:space-between; border:1px solid ${hiddenBorder}; background:${hiddenBg}`;
     el.innerHTML = `
-      <p style="font-size:13px; color:#a57f00">
+      <p style="font-size:13px; color:${hiddenLabel}">
         Handover from <strong>${escHtml(bannerData.person)}</strong> — hidden
       </p>
-      <button onclick="toggleBanner()" style="font-size:13px; font-weight:600; color:#c9a000; background:none; border:none; cursor:pointer; margin-left:12px">Show</button>`;
+      <button onclick="toggleBanner()" style="font-size:13px; font-weight:600; color:${btnColor}; background:none; border:none; cursor:pointer; margin-left:12px">Show</button>`;
   } else {
-    el.style.cssText = "margin:12px 24px 0; border-radius:12px; padding:14px 18px; border:1px solid #92400e; background:rgba(120,53,15,0.15)";
+    el.style.cssText = `margin:12px 24px 0; border-radius:12px; padding:14px 18px; border:1px solid ${border}; background:${bg}`;
     el.innerHTML = `
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px">
         <div>
-          <p style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#fbbf24; margin-bottom:6px">Handover from ${escHtml(bannerData.person)}</p>
-          <p style="font-size:14px; white-space:pre-wrap; color:#fde68a">${escHtml(bannerData.notes)}</p>
+          <p style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:${labelColor}; margin-bottom:6px">Handover from ${escHtml(bannerData.person)}</p>
+          <p style="font-size:14px; white-space:pre-wrap; color:${textColor}">${escHtml(bannerData.notes)}</p>
         </div>
-        <button onclick="toggleBanner()" style="font-size:13px; font-weight:600; color:#fbbf24; background:none; border:none; cursor:pointer; flex-shrink:0">Hide</button>
+        <button onclick="toggleBanner()" style="font-size:13px; font-weight:600; color:${btnColor}; background:none; border:none; cursor:pointer; flex-shrink:0">Hide</button>
       </div>`;
   }
 }
@@ -253,13 +273,9 @@ async function loadTimeline() {
 
 function renderTimeline(shifts) {
   const row = document.getElementById("timeline-row");
-  if (!shifts.length) {
-    row.innerHTML = `<span style="font-size:13px; color:var(--t3); font-style:italic">No previous shifts</span>`;
-    return;
-  }
   // newest rightmost: reverse the array (API returns newest-first)
   const ordered = [...shifts].reverse();
-  row.innerHTML = ordered.map((s, i) => {
+  let html = ordered.map((s, i) => {
     const style = PILL_STYLES[i % PILL_STYLES.length];
     const date = new Date(s.ended_at || s.started_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
     const ring = viewingShift && viewingShift._id === s._id ? "box-shadow:0 0 0 2px #fff;" : "";
@@ -270,6 +286,31 @@ function renderTimeline(shifts) {
         <span style="opacity:0.5; font-size:11px">${date}</span>
       </button>`;
   }).join("");
+
+  // Active shift pill — always rightmost; clicking it returns to live view
+  if (activeShift) {
+    const isLive = !viewingShift;
+    const ring = isLive ? "box-shadow:0 0 0 2px #4ade80;" : "";
+    html += `
+      <button class="timeline-pill" onclick="goLive()"
+        style="background:#052e16; border-color:#16a34a; color:#86efac; ${ring}"
+        title="Current live shift">
+        <span style="font-size:9px; color:#4ade80; line-height:1">●</span>
+        <span style="font-weight:600">${escHtml(activeShift.on_call_person)}</span>
+        <span style="opacity:0.6; font-size:10px; font-weight:700; letter-spacing:0.05em">LIVE</span>
+      </button>`;
+  }
+
+  if (!html) {
+    row.innerHTML = `<span style="font-size:13px; color:var(--t3); font-style:italic">No previous shifts</span>`;
+    return;
+  }
+  row.innerHTML = html;
+}
+
+function goLive() {
+  if (viewingShift) exitViewMode();
+  // already live — nothing to do
 }
 
 async function viewShift(shift) {
