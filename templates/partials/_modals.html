@@ -1,0 +1,220 @@
+<!-- ════════════════════════════════════════════════════════════════════════
+     MODAL — Task Detail
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="task-modal"
+  style="display:none; position:fixed; inset:0; z-index:50; backdrop-filter:blur(4px);
+         background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:16px">
+  <div class="theme-modal" style="border-radius:18px; width:100%; max-width:540px;
+       box-shadow:0 24px 48px rgba(0,0,0,0.25); display:flex; flex-direction:column; max-height:90vh">
+
+    <!-- Title -->
+    <div style="display:flex; align-items:flex-start; justify-content:space-between;
+                padding:20px 20px 16px; border-bottom:1px solid var(--br2)">
+      <input id="modal-title" type="text" oninput="markModalDirty()"
+        style="background:transparent; border:none; border-bottom:2px solid transparent;
+               color:var(--t1); font-size:20px; font-weight:700; width:100%; outline:none;
+               padding-bottom:4px; transition:border-color 0.15s"
+        onfocus="this.style.borderBottomColor='#6366f1'"
+        onblur="this.style.borderBottomColor='transparent'"
+        placeholder="Task title" />
+      <button onclick="closeModal()"
+        style="font-size:24px; color:var(--t3); background:none; border:none;
+               cursor:pointer; margin-left:12px; line-height:1">&times;</button>
+    </div>
+
+    <!-- Priority + Due -->
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:16px 24px;
+                padding:12px 20px; border-bottom:1px solid var(--br2)">
+      <!-- Priority -->
+      <div style="display:flex; align-items:center; gap:8px">
+        <span style="font-size:12px; font-weight:600; text-transform:uppercase;
+                     letter-spacing:0.06em; color:var(--t3)">Priority</span>
+        <div style="display:flex; gap:6px">
+          <button data-p="high"   onclick="setModalPriority('high')"
+            class="priority-btn badge-high"
+            style="padding:4px 12px; border-radius:6px; font-size:13px; font-weight:700;
+                   border:none; cursor:pointer">High</button>
+          <button data-p="medium" onclick="setModalPriority('medium')"
+            class="priority-btn badge-medium"
+            style="padding:4px 12px; border-radius:6px; font-size:13px; font-weight:700;
+                   border:none; cursor:pointer">Medium</button>
+          <button data-p="low"    onclick="setModalPriority('low')"
+            class="priority-btn badge-low"
+            style="padding:4px 12px; border-radius:6px; font-size:13px; font-weight:700;
+                   border:none; cursor:pointer">Low</button>
+        </div>
+      </div>
+      <!-- Due time -->
+      <div style="display:flex; align-items:center; gap:8px">
+        <span style="font-size:12px; font-weight:600; text-transform:uppercase;
+                     letter-spacing:0.06em; color:var(--t3)">Due</span>
+        <input id="modal-due" type="datetime-local" oninput="markModalDirty()"
+          class="theme-input" style="padding:5px 10px; font-size:13px" />
+        <button onclick="clearModalDue()"
+          style="font-size:13px; color:var(--t3); background:none; border:none; cursor:pointer">
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div id="modal-notes" style="flex:1; overflow-y:auto; padding:16px 20px; display:flex;
+                                  flex-direction:column; gap:10px; min-height:0"></div>
+
+    <!-- Footer -->
+    <div style="padding:16px 20px; border-top:1px solid var(--br2)">
+      <textarea id="modal-note-input" rows="2" oninput="this.style.height='auto'; this.style.height=this.scrollHeight+'px'"
+        class="theme-input" style="width:100%; padding:10px 14px; font-size:14px;
+               resize:none; overflow:hidden; min-height:44px"
+        placeholder="Add a note…"></textarea>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px">
+        <button onclick="deleteCurrentTask()"
+          style="font-size:13px; font-weight:600; color:#ef4444; background:none;
+                 border:none; cursor:pointer">Delete task</button>
+        <div style="display:flex; gap:8px">
+          <button id="modal-save" onclick="saveModalChanges()" disabled
+            style="padding:8px 18px; font-size:14px; font-weight:600; border-radius:10px;
+                   background:#4f46e5; color:#fff; border:none; cursor:pointer;
+                   opacity:0.4; transition:opacity 0.2s">
+            Save
+          </button>
+          <button onclick="submitNote()"
+            style="padding:8px 18px; font-size:14px; font-weight:600; border-radius:10px;
+                   background:#4f46e5; color:#fff; border:none; cursor:pointer;
+                   transition:opacity 0.15s"
+            onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+            Add note
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     MODAL — Start Shift
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="start-modal"
+  style="display:none; position:fixed; inset:0; z-index:50; backdrop-filter:blur(4px);
+         background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:16px">
+  <div class="theme-modal" style="border-radius:18px; width:100%; max-width:360px;
+       box-shadow:0 24px 48px rgba(0,0,0,0.25); padding:24px">
+    <h3 style="font-size:20px; font-weight:700; color:var(--t1); margin-bottom:16px">Start New Shift</h3>
+    <label style="display:block; font-size:14px; color:var(--t2); margin-bottom:6px">Your name</label>
+    <input id="start-name" type="text" class="theme-input"
+      style="width:100%; padding:10px 14px; font-size:15px; margin-bottom:20px"
+      placeholder="e.g. Alice" />
+    <div style="display:flex; justify-content:flex-end; gap:8px">
+      <button onclick="closeStartModal()"
+        style="padding:9px 18px; font-size:14px; font-weight:600; border-radius:10px;
+               background:var(--input-bg); color:var(--t1); border:1px solid var(--br); cursor:pointer">
+        Cancel
+      </button>
+      <button onclick="confirmStartShift()"
+        style="padding:9px 18px; font-size:14px; font-weight:600; border-radius:10px;
+               background:#4f46e5; color:#fff; border:none; cursor:pointer">
+        Start Shift
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     MODAL — End Shift
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="end-modal"
+  style="display:none; position:fixed; inset:0; z-index:50; backdrop-filter:blur(4px);
+         background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:16px">
+  <div class="theme-modal" style="border-radius:18px; width:100%; max-width:460px;
+       box-shadow:0 24px 48px rgba(0,0,0,0.25); padding:24px">
+    <h3 style="font-size:20px; font-weight:700; color:var(--t1); margin-bottom:4px">End Shift</h3>
+    <p style="font-size:14px; color:var(--t2); margin-bottom:16px">Leave notes for the next person.</p>
+    <label style="display:block; font-size:14px; color:var(--t2); margin-bottom:6px">Handover notes</label>
+    <textarea id="end-handover" rows="4" class="theme-input"
+      style="width:100%; padding:10px 14px; font-size:14px; resize:none; margin-bottom:20px"
+      placeholder="Open incidents, what to watch, anything important…"></textarea>
+    <div style="display:flex; justify-content:flex-end; gap:8px">
+      <button onclick="closeEndModal()"
+        style="padding:9px 18px; font-size:14px; font-weight:600; border-radius:10px;
+               background:var(--input-bg); color:var(--t1); border:1px solid var(--br); cursor:pointer">
+        Cancel
+      </button>
+      <button onclick="confirmEndShift()"
+        style="padding:9px 18px; font-size:14px; font-weight:600; border-radius:10px;
+               background:#b91c1c; color:#fff; border:none; cursor:pointer">
+        End Shift
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     MODAL — New Task
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="new-task-modal"
+  style="display:none; position:fixed; inset:0; z-index:50; backdrop-filter:blur(4px);
+         background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:16px">
+  <div class="theme-modal" style="border-radius:18px; width:100%; max-width:380px;
+       box-shadow:0 24px 48px rgba(0,0,0,0.25); padding:24px">
+    <h3 style="font-size:20px; font-weight:700; color:var(--t1); margin-bottom:16px">New Task</h3>
+    <input id="new-task-title" type="text" class="theme-input"
+      style="width:100%; padding:10px 14px; font-size:15px; margin-bottom:14px"
+      placeholder="Task title" />
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px">
+      <span style="font-size:14px; color:var(--t2)">Priority:</span>
+      <select id="new-task-priority" class="theme-input"
+        style="padding:6px 10px; font-size:14px">
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="display:block; font-size:14px; color:var(--t2); margin-bottom:6px">
+        Due time <span style="color:var(--t3)">(optional)</span>
+      </label>
+      <input id="new-task-due" type="datetime-local" class="theme-input"
+        style="width:100%; padding:8px 12px; font-size:14px" />
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:8px">
+      <button onclick="closeNewTaskModal()"
+        style="padding:9px 18px; font-size:14px; font-weight:600; border-radius:10px;
+               background:var(--input-bg); color:var(--t1); border:1px solid var(--br); cursor:pointer">
+        Cancel
+      </button>
+      <button onclick="confirmNewTask()"
+        style="padding:9px 18px; font-size:14px; font-weight:600; border-radius:10px;
+               background:#4f46e5; color:#fff; border:none; cursor:pointer">
+        Create
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     MODAL — Generic Confirm
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="confirm-modal"
+  style="display:none; position:fixed; inset:0; z-index:60; backdrop-filter:blur(4px);
+         background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:16px">
+  <div class="theme-modal" style="border-radius:18px; width:100%; max-width:320px;
+       box-shadow:0 24px 48px rgba(0,0,0,0.25); padding:24px">
+    <p id="confirm-message" style="font-size:15px; color:var(--t1); margin-bottom:20px"></p>
+    <div style="display:flex; justify-content:flex-end; gap:8px">
+      <button onclick="resolveConfirm(false)"
+        style="padding:9px 18px; font-size:14px; font-weight:600; border-radius:10px;
+               background:var(--input-bg); color:var(--t1); border:1px solid var(--br); cursor:pointer">
+        Cancel
+      </button>
+      <button id="confirm-ok-btn" onclick="resolveConfirm(true)"
+        style="padding:9px 18px; font-size:14px; font-weight:600; border-radius:10px;
+               background:#b91c1c; color:#fff; border:none; cursor:pointer">
+        Delete
+      </button>
+    </div>
+  </div>
+</div>

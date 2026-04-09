@@ -1,0 +1,324 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SLICK — style.css
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Theme Variables ───────────────────────────────────────────────────────── */
+:root {
+  --bg:           #f4f5fb;
+  --header:       #ffffff;
+  --header-border:#e5e7eb;
+  --column:       #e8eaf4;
+  --card:         #ffffff;
+  --input-bg:     #f0f1f8;
+  --modal:        #f8f9fc;
+  --modal-border: #d1d5db;
+  --t1:           #1e2130;
+  --t2:           #4b5563;
+  --t3:           #9ca3af;
+  --br:           #d1d5db;
+  --br2:          #e5e7eb;
+  --shadow:       0 2px 8px rgba(0,0,0,0.08);
+}
+
+html.dark {
+  --bg:           #0f1117;
+  --header:       #0d0f18;
+  --header-border:#1a2035;
+  --column:       #141621;
+  --card:         #1e2130;
+  --input-bg:     #0c0e16;
+  --modal:        #1a1d2e;
+  --modal-border: #2d3748;
+  --t1:           #e2e8f0;
+  --t2:           #94a3b8;
+  --t3:           #6b7280;
+  --br:           #2d3748;
+  --br2:          #1a2035;
+  --shadow:       0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--t1);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+#app-header {
+  background: var(--header);
+  border-bottom: 1px solid var(--header-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 24px;
+  box-shadow: var(--shadow);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+/* ── Content area ──────────────────────────────────────────────────────────── */
+#content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Board wrap ────────────────────────────────────────────────────────────── */
+#board-wrap {
+  display: flex;
+  gap: 20px;
+  padding: 20px 24px;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  flex-direction: row;
+}
+
+/* ── Column sections ───────────────────────────────────────────────────────── */
+.board-col {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--column);
+  transition: background 0.3s;
+  flex: 1;
+  height: 100%;
+}
+
+.col-todo  { border-top: 3px solid #6366f1; }
+.col-doing { border-top: 3px solid #a855f7; }
+.col-done  { border-top: 3px solid #22c55e; }
+
+.col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--br2);
+  flex-shrink: 0;
+}
+
+.col-cards {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* Section labels inside columns */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px 2px;
+  margin-top: 4px;
+  user-select: none;
+  pointer-events: none;   /* don't interfere with drag */
+  flex-shrink: 0;
+}
+.section-label-line {
+  flex: 1;
+  height: 1px;
+  opacity: 0.3;
+}
+
+/* ── Task cards ────────────────────────────────────────────────────────────── */
+.task-card {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: grab;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.3s;
+  box-shadow: var(--shadow);
+  flex-shrink: 0;
+}
+.task-card:active  { cursor: grabbing; }
+.task-card:hover   { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+
+.sortable-ghost { opacity: 0.3; border: 2px dashed #6366f1 !important; background: var(--column) !important; border-radius: 10px; }
+.sortable-drag  { opacity: 0.9; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+
+/* Priority borders */
+.priority-high   { border-left: 4px solid #ef4444; }
+.priority-medium { border-left: 4px solid #f59e0b; }
+.priority-low    { border-left: 4px solid #22c55e; }
+
+/* Priority badges */
+.badge-high   { background: #fee2e2; color: #991b1b; }
+.badge-medium { background: #fef3c7; color: #92400e; }
+.badge-low    { background: #d1fae5; color: #065f46; }
+html.dark .badge-high   { background: #7f1d1d; color: #fca5a5; }
+html.dark .badge-medium { background: #78350f; color: #fcd34d; }
+html.dark .badge-low    { background: #14532d; color: #86efac; }
+
+/* Overdue card */
+.task-overdue { background: rgba(239,68,68,0.1) !important; box-shadow: 0 0 0 1px rgba(239,68,68,0.35); }
+
+/* Carried-over entrance */
+@keyframes carriedIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+.carried-in { animation: carriedIn 0.45s ease forwards; }
+
+/* ── Floating calendar button ──────────────────────────────────────────────── */
+#cal-float-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 45;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 20px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(79,70,229,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+#cal-float-btn:hover { transform: scale(1.1); box-shadow: 0 6px 22px rgba(79,70,229,0.55); }
+#cal-float-btn.active { background: #6366f1; }
+
+/* ── Calendar panel (fixed, bottom-left) ───────────────────────────────────── */
+#calendar-panel {
+  position: fixed;
+  bottom: 78px;
+  right: 20px;
+  z-index: 44;
+  width: 320px;
+  background: var(--modal);
+  border: 1px solid var(--modal-border);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  display: none;
+  transition: background 0.3s;
+}
+#calendar-panel.open { display: block; }
+
+.cal-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  cursor: default;
+  transition: transform 0.1s, box-shadow 0.1s;
+  position: relative;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 6px;
+  color: var(--t1);
+}
+.cal-cell.has-tasks { cursor: pointer; }
+.cal-cell.has-tasks:hover { transform: scale(1.1); z-index: 2; box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+.cal-today { box-shadow: 0 0 0 2px #6366f1 !important; }
+.cal-other-month { opacity: 0.35; }
+
+#cal-tooltip {
+  position: fixed;
+  z-index: 200;
+  pointer-events: none;
+  background: var(--modal);
+  border: 1px solid var(--modal-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  max-width: 240px;
+  font-size: 13px;
+  color: var(--t1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  display: none;
+}
+
+/* ── Modals ────────────────────────────────────────────────────────────────── */
+.modal-overlay { backdrop-filter: blur(4px); }
+.theme-modal {
+  background: var(--modal);
+  border: 1px solid var(--modal-border);
+  color: var(--t1);
+  transition: background 0.3s;
+}
+.theme-input {
+  background: var(--input-bg);
+  border: 1px solid var(--br);
+  color: var(--t1);
+  border-radius: 10px;
+  transition: border-color 0.15s, background 0.3s;
+}
+.theme-input:focus { outline: none; border-color: #6366f1; }
+.theme-border { border-color: var(--br2); }
+
+/* ── Timeline pills ────────────────────────────────────────────────────────── */
+.timeline-pill {
+  transition: all 0.15s;
+  white-space: nowrap;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Header controls ───────────────────────────────────────────────────────── */
+.header-btn {
+  padding: 7px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s, background 0.15s;
+}
+.header-btn:hover { opacity: 0.85; }
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--br); border-radius: 3px; }
+
+/* ── Start-shift sweep ─────────────────────────────────────────────────────── */
+@keyframes colGlow {
+  0%   { box-shadow: none; }
+  40%  { box-shadow: 0 0 50px var(--glow-color); }
+  100% { box-shadow: none; }
+}
+.glow-todo  { --glow-color: rgba(99,102,241,0.8);  animation: colGlow 0.75s ease forwards; }
+.glow-doing { --glow-color: rgba(168,85,247,0.8);  animation: colGlow 0.75s ease forwards; }
+.glow-done  { --glow-color: rgba(34,197,94,0.8);   animation: colGlow 0.75s ease forwards; }
+
+/* ── Banners ───────────────────────────────────────────────────────────────── */
+#handover-banner, #view-banner {
+  margin: 12px 24px 0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+#view-banner {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--input-bg);
+  border: 1px solid var(--br);
+  color: var(--t2);
+}
+#view-banner.show { display: flex; }

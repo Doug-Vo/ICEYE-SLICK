@@ -1,0 +1,36 @@
+<!-- Floating toggle button -->
+<button id="cal-float-btn" onclick="toggleCalendar()" title="Toggle calendar">📅</button>
+
+<!-- Fixed floating calendar panel -->
+<div id="calendar-panel">
+
+  <!-- Navigation -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px">
+    <button onclick="prevMonth()"
+      style="width:30px; height:30px; border-radius:8px; border:1px solid var(--br);
+             background:var(--input-bg); color:#818cf8; font-size:16px; font-weight:700;
+             cursor:pointer; display:flex; align-items:center; justify-content:center">‹</button>
+    <h3 id="cal-month-label"
+      style="font-size:14px; font-weight:700; color:var(--t1)"></h3>
+    <button onclick="nextMonth()"
+      style="width:30px; height:30px; border-radius:8px; border:1px solid var(--br);
+             background:var(--input-bg); color:#818cf8; font-size:16px; font-weight:700;
+             cursor:pointer; display:flex; align-items:center; justify-content:center">›</button>
+  </div>
+
+  <!-- Day-of-week headers -->
+  <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:4px;
+              text-align:center; font-size:11px; font-weight:600; color:var(--t3)">
+    <div>M</div><div>T</div><div>W</div>
+    <div>T</div><div>F</div>
+    <div style="color:#818cf8">S</div>
+    <div style="color:#818cf8">S</div>
+  </div>
+
+  <!-- Calendar grid -->
+  <div id="cal-grid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px"></div>
+
+</div>
+
+<!-- Floating tooltip -->
+<div id="cal-tooltip"></div>

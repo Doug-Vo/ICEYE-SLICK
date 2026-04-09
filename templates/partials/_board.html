@@ -1,0 +1,36 @@
+<div id="board-wrap" data-layout="row">
+
+  <!-- ── To-Do ── -->
+  <div class="board-col col-todo">
+    <div class="col-header">
+      <span style="font-size:15px; font-weight:700; color:#6366f1; text-transform:uppercase; letter-spacing:0.08em">To-Do</span>
+      <button id="add-todo" onclick="openNewTaskModal('todo')"
+        style="font-size:22px; font-weight:700; color:#6366f1; background:none; border:none;
+               cursor:pointer; line-height:1; padding:0 4px">+</button>
+    </div>
+    <div id="col-todo" class="col-cards"></div>
+  </div>
+
+  <!-- ── Doing ── -->
+  <div class="board-col col-doing">
+    <div class="col-header">
+      <span style="font-size:15px; font-weight:700; color:#a855f7; text-transform:uppercase; letter-spacing:0.08em">Doing</span>
+      <button id="add-doing" onclick="openNewTaskModal('doing')"
+        style="font-size:22px; font-weight:700; color:#a855f7; background:none; border:none;
+               cursor:pointer; line-height:1; padding:0 4px">+</button>
+    </div>
+    <div id="col-doing" class="col-cards"></div>
+  </div>
+
+  <!-- ── Done ── -->
+  <div class="board-col col-done">
+    <div class="col-header">
+      <span style="font-size:15px; font-weight:700; color:#22c55e; text-transform:uppercase; letter-spacing:0.08em">Done</span>
+      <button id="add-done" onclick="openNewTaskModal('done')"
+        style="font-size:22px; font-weight:700; color:#22c55e; background:none; border:none;
+               cursor:pointer; line-height:1; padding:0 4px">+</button>
+    </div>
+    <div id="col-done" class="col-cards"></div>
+  </div>
+
+</div>

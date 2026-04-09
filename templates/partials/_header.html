@@ -1,0 +1,26 @@
+<header id="app-header">
+  <!-- Logo -->
+  <div style="display:flex; align-items:center; gap:10px; flex-shrink:0">
+    <span style="font-size:22px; font-weight:900; letter-spacing:0.15em; color:#6366f1">SLICK</span>
+    <span style="font-size:12px; color:var(--t3); font-family:monospace">on-call handover</span>
+  </div>
+
+  <!-- Timeline (last 6 ended shifts) -->
+  <div id="timeline-row"
+       style="display:flex; align-items:center; gap:8px; overflow-x:auto; flex:1; padding:0 12px">
+  </div>
+
+  <!-- Right controls -->
+  <div style="display:flex; align-items:center; gap:10px; flex-shrink:0">
+    <!-- Light/dark toggle -->
+    <button id="theme-btn" onclick="toggleTheme()"
+      title="Toggle theme"
+      style="width:38px; height:38px; border-radius:10px; border:1px solid var(--br);
+             background:var(--input-bg); cursor:pointer; font-size:18px;
+             display:flex; align-items:center; justify-content:center; transition:background 0.2s">
+    </button>
+
+    <!-- Shift actions -->
+    <div id="shift-actions"></div>
+  </div>
+</header>
