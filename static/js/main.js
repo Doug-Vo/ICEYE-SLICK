@@ -4,16 +4,15 @@
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-let activeShift    = null;
+let activeShifts   = [];   // all currently active shift objects
 let tasks          = [];
 let currentTaskId  = null;
 let newTaskColumn  = "todo";
-let viewingShift   = null;
+let viewingShift   = null; // shift currently shown (active or ended)
 let sortables      = [];
 let confirmResolve = null;
 let bannerData     = null;
 let bannerHidden   = false;
-let liveBannerData = null;  // preserved across timeline view sessions
 let modalOrigTitle = "";
 let modalOrigDue   = "";
 let calendarOpen   = false;
@@ -25,18 +24,10 @@ calMonth.setDate(1);
 
 async function boot() {
   initTheme();
-  await refreshShift();
+  await refreshShifts();
   await loadTimeline();
-  await refreshTasks();
+  if (activeShifts.length > 0) await selectShift(activeShifts[0]);
   initSortable();
-  // Restore handover banner from the most recent ended shift (survives page reload)
-  if (activeShift) {
-    const res = await fetch("/api/shifts");
-    const ended = await res.json();
-    if (ended.length && ended[0].end_handover_notes) {
-      renderHandoverBanner(ended[0].on_call_person, ended[0].end_handover_notes);
-    }
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -99,22 +90,30 @@ function hideModal(id) { document.getElementById(id).style.display = "none"; }
 // SHIFT
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function refreshShift() {
+async function refreshShifts() {
   const res = await fetch("/api/shifts/active");
-  activeShift = await res.json();
+  activeShifts = await res.json();
   renderShiftActions();
+}
+
+function isViewingActive() {
+  if (!viewingShift) return false;
+  return activeShifts.some(s => s._id === viewingShift._id);
 }
 
 function renderShiftActions() {
   const el = document.getElementById("shift-actions");
-  if (activeShift) {
-    const started = new Date(activeShift.started_at).toLocaleString(undefined, {
+  const viewingActive = isViewingActive();
+  let html = "";
+
+  if (viewingActive && viewingShift) {
+    const started = new Date(viewingShift.started_at).toLocaleString(undefined, {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
-    el.innerHTML = `
+    html += `
       <div style="display:flex; align-items:center; gap:10px">
         <div style="text-align:right; display:none" class="sm-show">
-          <p style="font-size:13px; font-weight:600; color:var(--t1)">${escHtml(activeShift.on_call_person)}</p>
+          <p style="font-size:13px; font-weight:600; color:var(--t1)">${escHtml(viewingShift.on_call_person)}</p>
           <p style="font-size:11px; color:var(--t3)">${started}</p>
         </div>
         <button onclick="openEndModal()"
@@ -123,18 +122,20 @@ function renderShiftActions() {
           End Shift
         </button>
       </div>`;
-  } else {
-    el.innerHTML = `
-      <button onclick="openStartModal()"
-        style="padding:8px 16px; font-size:14px; font-weight:600; border-radius:10px;
-               background:#4f46e5; color:#fff; border:none; cursor:pointer">
-        Start Shift
-      </button>`;
   }
-  const canEdit = activeShift && !viewingShift;
+
+  html += `
+    <button onclick="openStartModal()"
+      style="padding:8px 16px; font-size:14px; font-weight:600; border-radius:10px;
+             background:#4f46e5; color:#fff; border:none; cursor:pointer">
+      Start Shift
+    </button>`;
+
+  el.innerHTML = html;
+
   ["add-todo", "add-doing", "add-done"].forEach(id => {
     const btn = document.getElementById(id);
-    if (btn) btn.style.visibility = canEdit ? "visible" : "hidden";
+    if (btn) btn.style.visibility = viewingActive ? "visible" : "hidden";
   });
 }
 
@@ -154,10 +155,13 @@ async function confirmStartShift() {
   });
   const data = await res.json();
 
-  await refreshShift();
+  await refreshShifts();
   await loadTimeline();
-  await refreshTasks();
   playStartAnimation();
+
+  // Auto-select the newly created shift
+  const newShift = activeShifts.find(s => s._id === data._id) || activeShifts[0];
+  if (newShift) await selectShift(newShift);
 
   if (data.prev_handover_notes) renderHandoverBanner(data.prev_on_call_person, data.prev_handover_notes);
   else clearHandoverBanner();
@@ -171,12 +175,31 @@ function closeEndModal() { hideModal("end-modal"); }
 async function confirmEndShift() {
   const notes = document.getElementById("end-handover").value.trim();
   closeEndModal();
+  if (!viewingShift) return;
+
   await fetch("/api/shifts/end", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ end_handover_notes: notes }),
+    body: JSON.stringify({ shift_id: viewingShift._id, end_handover_notes: notes }),
   });
-  await refreshShift();
+
+  await refreshShifts();
   await loadTimeline();
+
+  // Navigate: prefer another active shift; else show the just-ended shift
+  if (activeShifts.length > 0) {
+    await selectShift(activeShifts[0]);
+  } else {
+    const endedRes = await fetch("/api/shifts");
+    const ended = await endedRes.json();
+    if (ended.length > 0) {
+      await selectShift(ended[0]);
+    } else {
+      viewingShift = null;
+      tasks = [];
+      renderBoard(false);
+      renderShiftActions();
+    }
+  }
 }
 
 // ─── Start animation ────────────────────────────────────────────────────────
@@ -202,8 +225,6 @@ function playStartAnimation() {
 function renderHandoverBanner(person, notes) {
   bannerData = { person, notes };
   bannerHidden = false;
-  // Only persist as the "live" banner when we're not viewing a past shift
-  if (!viewingShift) liveBannerData = { person, notes };
   _paintBanner();
 }
 
@@ -246,9 +267,6 @@ function toggleBanner() { bannerHidden = !bannerHidden; _paintBanner(); }
 function clearHandoverBanner() {
   bannerData = null;
   bannerHidden = false;
-  // Only wipe the live banner when we're not in view mode —
-  // view mode temporarily replaces the banner but live data must survive
-  if (!viewingShift) liveBannerData = null;
   const el = document.getElementById("handover-banner");
   el.style.display = "none"; el.innerHTML = ""; el.style.cssText = "";
 }
@@ -273,80 +291,82 @@ async function loadTimeline() {
 
 function renderTimeline(shifts) {
   const row = document.getElementById("timeline-row");
-  // newest rightmost: reverse the array (API returns newest-first)
+
+  // On-call pills (active shifts)
+  const activePillsHtml = activeShifts.map(s => {
+    const isSelected = viewingShift && viewingShift._id === s._id;
+    const ring = isSelected ? "box-shadow:0 0 0 2px #4ade80;" : "";
+    return `
+      <button class="timeline-pill" onclick="selectShift(${JSON.stringify(s).replace(/"/g, '&quot;')})"
+        style="background:#052e16; border-color:#16a34a; color:#86efac; ${ring}"
+        title="Active — ${escHtml(s.on_call_person)}">
+        <span style="font-size:9px; color:#4ade80; line-height:1">●</span>
+        <span style="font-weight:600">${escHtml(s.on_call_person)}</span>
+        <span style="opacity:0.6; font-size:10px; font-weight:700; letter-spacing:0.05em">LIVE</span>
+      </button>`;
+  }).join("");
+
+  // Completed pills (ended shifts, newest rightmost)
   const ordered = [...shifts].reverse();
-  let html = ordered.map((s, i) => {
+  const historyPillsHtml = ordered.map((s, i) => {
     const style = PILL_STYLES[i % PILL_STYLES.length];
     const date = new Date(s.ended_at || s.started_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    const ring = viewingShift && viewingShift._id === s._id ? "box-shadow:0 0 0 2px #fff;" : "";
+    const isSelected = viewingShift && viewingShift._id === s._id;
+    const ring = isSelected ? "box-shadow:0 0 0 2px #fff;" : "";
     return `
-      <button class="timeline-pill" onclick="viewShift(${JSON.stringify(s).replace(/"/g, '&quot;')})"
+      <button class="timeline-pill" onclick="selectShift(${JSON.stringify(s).replace(/"/g, '&quot;')})"
         style="${style}; ${ring}" title="${escHtml(s.end_handover_notes || 'No handover notes')}">
         <span style="font-weight:600">${escHtml(s.on_call_person)}</span>
         <span style="opacity:0.5; font-size:11px">${date}</span>
       </button>`;
   }).join("");
 
-  // Active shift pill — always rightmost; clicking it returns to live view
-  if (activeShift) {
-    const isLive = !viewingShift;
-    const ring = isLive ? "box-shadow:0 0 0 2px #4ade80;" : "";
-    html += `
-      <button class="timeline-pill" onclick="goLive()"
-        style="background:#052e16; border-color:#16a34a; color:#86efac; ${ring}"
-        title="Current live shift">
-        <span style="font-size:9px; color:#4ade80; line-height:1">●</span>
-        <span style="font-weight:600">${escHtml(activeShift.on_call_person)}</span>
-        <span style="opacity:0.6; font-size:10px; font-weight:700; letter-spacing:0.05em">LIVE</span>
-      </button>`;
-  }
-
-  if (!html) {
-    row.innerHTML = `<span style="font-size:13px; color:var(--t3); font-style:italic">No previous shifts</span>`;
+  if (!activeShifts.length && !ordered.length) {
+    row.innerHTML = `<span style="font-size:13px; color:var(--t3); font-style:italic">No shifts yet</span>`;
     return;
   }
-  row.innerHTML = html;
+
+  const activeLabel   = activeShifts.length
+    ? `<span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#4ade80; flex-shrink:0">On-call</span>`
+    : "";
+  const completedLabel = ordered.length
+    ? `<span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--t3); flex-shrink:0">Completed</span>`
+    : "";
+  const divider = activeShifts.length && ordered.length
+    ? `<div style="width:1px; height:28px; background:var(--br); flex-shrink:0; margin:0 4px"></div>`
+    : "";
+
+  row.innerHTML = `${activeLabel}${activePillsHtml}${divider}${completedLabel}${historyPillsHtml}`;
 }
 
-function goLive() {
-  if (viewingShift) exitViewMode();
-  // already live — nothing to do
-}
-
-async function viewShift(shift) {
+async function selectShift(shift) {
   viewingShift = shift;
-  const endedAt = new Date(shift.ended_at).toLocaleString(undefined, { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
-  document.getElementById("view-banner-text").textContent = `Viewing ${shift.on_call_person}'s shift — ended ${endedAt}`;
-  document.getElementById("view-banner").classList.add("show");
-  clearHandoverBanner();
-  if (shift.end_handover_notes) renderHandoverBanner(shift.on_call_person, shift.end_handover_notes);
-
   const res = await fetch(`/api/tasks?shift_id=${shift._id}`);
   tasks = await res.json();
-  renderBoard(true);
-  setSortableEnabled(false);
+  const readOnly = !isViewingActive();
+  renderBoard(readOnly);
+  setSortableEnabled(!readOnly);
+
+  if (readOnly) {
+    const endedAt = new Date(shift.ended_at).toLocaleString(undefined,
+      { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+    document.getElementById("view-banner-text").textContent =
+      `Viewing ${shift.on_call_person}'s shift — ended ${endedAt}`;
+    document.getElementById("view-banner").classList.add("show");
+    if (shift.end_handover_notes) renderHandoverBanner(shift.on_call_person, shift.end_handover_notes);
+    else clearHandoverBanner();
+  } else {
+    document.getElementById("view-banner").classList.remove("show");
+    const endedRes = await fetch("/api/shifts");
+    const ended = await endedRes.json();
+    if (ended.length && ended[0].end_handover_notes)
+      renderHandoverBanner(ended[0].on_call_person, ended[0].end_handover_notes);
+    else clearHandoverBanner();
+  }
+
   loadTimeline();
   renderShiftActions();
   renderCalendar();
-}
-
-function exitViewMode() {
-  viewingShift = null;
-  document.getElementById("view-banner").classList.remove("show");
-
-  // Restore the live shift's handover banner (if there was one)
-  if (liveBannerData) {
-    bannerData   = liveBannerData;
-    bannerHidden = false;
-    _paintBanner();
-  } else {
-    clearHandoverBanner();
-  }
-
-  refreshTasks();
-  setSortableEnabled(true);
-  loadTimeline();
-  renderShiftActions();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -354,9 +374,10 @@ function exitViewMode() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function refreshTasks() {
-  const res = await fetch("/api/tasks");
+  if (!viewingShift) { tasks = []; renderBoard(false); return; }
+  const res = await fetch(`/api/tasks?shift_id=${viewingShift._id}`);
   tasks = await res.json();
-  renderBoard(false);
+  renderBoard(!isViewingActive());
   renderCalendar();
 }
 
@@ -497,7 +518,7 @@ async function updateTaskStatus(taskId, status) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function openNewTaskModal(column) {
-  if (!activeShift) return;
+  if (!isViewingActive()) return;
   newTaskColumn = column;
   document.getElementById("new-task-title").value = "";
   document.getElementById("new-task-priority").value = "medium";
@@ -517,7 +538,8 @@ async function confirmNewTask() {
 
   const res = await fetch("/api/tasks", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, priority, status: newTaskColumn, due_time }),
+    body: JSON.stringify({ title, priority, status: newTaskColumn, due_time,
+      shift_id: viewingShift ? viewingShift._id : null }),
   });
   tasks.push(await res.json());
   renderBoard(false);
@@ -529,7 +551,7 @@ async function confirmNewTask() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function openTaskModal(taskId) {
-  if (viewingShift) return;
+  if (!isViewingActive()) return;
   currentTaskId = taskId;
   const task = tasks.find(t => t._id === taskId);
   if (!task) return;
