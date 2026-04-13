@@ -32,9 +32,9 @@ def index():
 # ─── Shifts ───────────────────────────────────────────────────────────────────
 
 @app.route("/api/shifts/active")
-def get_active_shift():
-    shift = shifts_col.find_one({"status": "active"})
-    return jsonify(serialize(shift) if shift else None)
+def get_active_shifts():
+    shifts = list(shifts_col.find({"status": "active"}).sort("started_at", 1))
+    return jsonify([serialize(s) for s in shifts])
 
 
 @app.route("/api/shifts")
@@ -47,13 +47,6 @@ def get_shifts():
 @app.route("/api/shifts/start", methods=["POST"])
 def start_shift():
     data = request.json or {}
-
-    # End any currently active shift (safety — shouldn't normally be one if
-    # the user properly hit End Shift first, but guard against edge cases)
-    shifts_col.update_many(
-        {"status": "active"},
-        {"$set": {"status": "ended", "ended_at": datetime.now(timezone.utc)}}
-    )
 
     # Find the most recently ended shift to carry tasks from
     prev_shift = shifts_col.find_one({"status": "ended"}, sort=[("ended_at", -1)])
@@ -104,8 +97,15 @@ def start_shift():
 @app.route("/api/shifts/end", methods=["POST"])
 def end_shift():
     data = request.json or {}
+    shift_id_raw = data.get("shift_id")
+    if not shift_id_raw:
+        return jsonify({"error": "shift_id required"}), 400
+    try:
+        oid = ObjectId(shift_id_raw)
+    except Exception:
+        return jsonify({"error": "Invalid shift_id"}), 400
     shift = shifts_col.find_one_and_update(
-        {"status": "active"},
+        {"_id": oid, "status": "active"},
         {"$set": {
             "status": "ended",
             "ended_at": datetime.now(timezone.utc),
@@ -115,7 +115,7 @@ def end_shift():
     )
     if shift:
         return jsonify(serialize(shift))
-    return jsonify({"error": "No active shift"}), 404
+    return jsonify({"error": "Active shift not found"}), 404
 
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────
@@ -140,7 +140,14 @@ def get_tasks():
 @app.route("/api/tasks", methods=["POST"])
 def create_task():
     data = request.json or {}
-    shift = shifts_col.find_one({"status": "active"})
+    shift_id_raw = data.get("shift_id")
+    if shift_id_raw:
+        try:
+            shift = shifts_col.find_one({"_id": ObjectId(shift_id_raw), "status": "active"})
+        except Exception:
+            shift = None
+    else:
+        shift = shifts_col.find_one({"status": "active"})
     if not shift:
         return jsonify({"error": "No active shift"}), 400
     now = datetime.now(timezone.utc)

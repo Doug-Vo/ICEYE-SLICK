@@ -1,5 +1,7 @@
 # SLICK — On-Call Handover Board
 
+**Live:** [slick-iceye.azurewebsites.net](https://slick-iceye.azurewebsites.net/)
+
 A lightweight on-call handover tool built around a Scrum-style board (To-Do / Doing / Done) per shift. Tasks carry over between shifts, support due dates, timestamped notes, and priority levels. Includes a shift timeline, heatmap calendar, and light/dark mode.
 
 ---
@@ -40,7 +42,7 @@ A lightweight on-call handover tool built around a Scrum-style board (To-Do / Do
 ### Install
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Doug-Vo/ICEYE-SLICK
 cd ICEYE
 pip install -r requirements.txt
 ```

@@ -2,7 +2,10 @@
 
 ## What this is
 
-SLICK is a web-based on-call handover tool. It replaces ad-hoc Slack threads with a structured per-shift Scrum board. Each person on call gets a To-Do / Doing / Done board, leaves handover notes when they finish, and the next person's incomplete tasks carry over automatically.
+SLICK is a web-based on-call handover tool. It replaces ad-hoc Slack threads with a structured per-shift Scrum board. Multiple people can be on-call simultaneously — each gets their own To-Do / Doing / Done board. Incomplete tasks carry over when a new shift starts. Ended shifts are browsable in a read-only timeline.
+
+**Live:** [slick-iceye.azurewebsites.net](https://slick-iceye.azurewebsites.net/)
+**Repo:** [Doug-Vo/ICEYE-SLICK](https://github.com/Doug-Vo/ICEYE-SLICK)
 
 ## Stack
 
@@ -21,14 +24,14 @@ Dockerfile / .dockerignore      Container build
 templates/
   index.html                    Thin shell — only includes partials
   partials/
-    _header.html                Logo, shift timeline pills, theme toggle, shift actions
-    _banners.html               Handover banner + view-mode banner
+    _header.html                Logo + GitHub pill, timeline pills, theme toggle, shift actions
+    _banners.html               Handover banner + view-mode banner (no back button — pill-driven nav)
     _board.html                 Three Scrum columns (board-wrap + col-todo/doing/done)
     _calendar.html              Floating 📅 button (bottom-right) + fixed calendar panel
     _modals.html                Five modals: task detail, start shift, end shift, new task, confirm
 static/
   css/style.css                 All styles; :root (light) and html.dark override variables
-  js/main.js                    All frontend logic (~750 lines)
+  js/main.js                    All frontend logic
 ```
 
 ## MongoDB
@@ -40,39 +43,74 @@ Database: `slick`. Two collections:
 
 ## Key behaviours
 
-**Shift lifecycle**
-- Only one shift can be `active` at a time.
-- **End Shift** stores `end_handover_notes` on the shift document, marks it `ended`.
-- **Start Shift** looks for the most recently ended shift, copies its `todo` and `done` tasks into the new shift with `carried_over: True` and `carried_over_from: <name>`. Done tasks are NOT carried over.
-- The previous shift's `end_handover_notes` are returned in the start-shift API response so the frontend can show the yellow banner.
+### Shift lifecycle — multi-shift
 
-**Task carry-over**
-- Only `todo` and `doing` tasks carry over — intentional, done tasks stay on the old shift.
-- Carried-over tasks show "↩ carried over from Alice" in indigo on the card.
+- **Multiple shifts can be `active` simultaneously** — one per on-call person.
+- `GET /api/shifts/active` returns an **array** of all active shifts (sorted `started_at` ascending).
+- **Start Shift** does NOT end other active shifts. It finds the most recently ended shift, copies its `todo`/`doing` tasks into the new shift with `carried_over: True`, and returns the previous shift's `end_handover_notes` for the banner.
+- **End Shift** requires `shift_id` in the POST body — it only ends that specific shift. The frontend sends `viewingShift._id`.
+- After ending, the frontend navigates to another active shift if one exists, otherwise shows the just-ended shift read-only.
 
-**Timeline**
+### Task carry-over
+
+- Only `todo` and `doing` tasks carry over — done tasks stay on the old shift for timeline integrity.
+- `carried_over_from` preserves the **original** creator across multiple carry-overs (Newt→Alice→Bob still shows "from Newt").
+- Carried-over tasks show "↩ from Alice" in indigo on the card.
+- `POST /api/tasks` accepts an optional `shift_id` in the body — the frontend always sends it so tasks go to the correct person's shift.
+
+### Navigation — all pill-driven
+
+- The header timeline has two sections: **On-call** (green `● LIVE` pills) and **Completed** (coloured history pills), separated by a vertical divider.
+- Clicking any pill calls `selectShift(shift)` — the single navigation function for both active and ended shifts.
+- Active shifts → editable board, sortable enabled, no view-mode banner, "End Shift" visible.
+- Ended shifts → read-only board, sortable disabled, view-mode banner shown, "End Shift" hidden.
+- There is no "Back to live" button — click an On-call pill to return.
+- On page load, `boot()` auto-selects `activeShifts[0]` (oldest active shift).
+
+### Frontend state
+
+- `activeShifts[]` — all currently active shift objects (from `/api/shifts/active`)
+- `viewingShift` — the shift whose board is currently displayed (active or ended)
+- `isViewingActive()` — returns true if `viewingShift._id` is in `activeShifts`; drives read/write mode everywhere
+- `selectShift(shift)` — central nav: fetches tasks, toggles sortable, manages banners, re-renders timeline + actions
+- `refreshShifts()` — fetches `/api/shifts/active`, updates `activeShifts`, re-renders shift actions
+
+### Timeline
+
 - `GET /api/shifts` returns the last 6 **ended** shifts, newest first.
-- The frontend reverses the array so oldest is leftmost, newest is rightmost.
-- Clicking a pill calls `viewShift()` which fetches that shift's tasks via `GET /api/tasks?shift_id=<id>` and renders the board read-only. SortableJS is disabled in view mode.
+- The frontend reverses the array so oldest is leftmost, newest is rightmost (within the Completed section).
 
-**Calendar**
+### Handover banner
+
+- Yellow/amber banner shown when there are handover notes from the previous shift.
+- Theme-aware colours: dark mode uses amber; light mode uses dark brown on pale yellow.
+- When viewing an active shift: shows the most recently ended shift's notes.
+- When viewing a history shift: shows that shift's own `end_handover_notes`.
+- `applyTheme()` calls `_paintBanner()` so the banner repaints immediately on theme toggle.
+
+### Calendar
+
 - Floating fixed panel, bottom-right corner (`#cal-float-btn` + `#calendar-panel`).
 - Renders a monthly grid. Days with due tasks get an indigo heat colour (opacity scales with count).
 - Hover tooltip shows task titles for that day.
-- The calendar reflects whichever tasks are currently loaded (live shift or viewed shift).
+- Reflects whichever tasks are currently loaded (any viewed shift).
 
-**Theme**
-- Light is the default. `html.dark` class is toggled; CSS vars swap.
+### Theme
+
+- Dark is the default. `html.dark` class is toggled; CSS vars swap.
 - Preference persisted to `localStorage` key `slick-theme`.
-- The `applyTheme()` function also sets `color-scheme` on datetime inputs.
+- `applyTheme()` also sets `color-scheme` on datetime inputs and repaints the handover banner.
 
-**Modal dirty tracking**
+### Modal dirty tracking
+
 - The task detail modal has a single **Save** button for title + due time changes.
 - It starts disabled (`opacity: 0.4`). `markModalDirty()` is wired to `oninput` on both fields.
 - On save, the snapshot (`modalOrigTitle`, `modalOrigDue`) is refreshed and button resets to disabled.
 - Priority auto-saves immediately on button click (no Save required).
+- Modal only opens when `isViewingActive()` — blocked in read-only history view.
 
-**Column subsections**
+### Column subsections
+
 - Within each column, tasks are grouped into labelled sections: Overdue / Due Today / Within 3 Days / This Week / Later / No due date.
 - Section labels have class `section-label` and `pointer-events: none`.
 - SortableJS uses `filter: '.section-label'` to skip them during drag.
@@ -86,6 +124,10 @@ Database: `slick`. Two collections:
 
 ## What NOT to change without understanding
 
-- The `start_shift` route looks for `status: "ended"` (not `"active"`) when finding the previous shift — this is intentional because the user ends their shift before the next person starts.
-- `formatTimestamp` guards with `isNaN(d.getTime())` — old notes stored with Python's `datetime.isoformat()` including `+00:00` offset parse fine, but null/missing timestamps must not render "Invalid Date".
+- `GET /api/shifts/active` returns an **array**, not a single object — the frontend expects this.
+- `POST /api/shifts/end` requires `shift_id` in the request body — it will 400 without it.
+- `POST /api/tasks` should include `shift_id` in the body — without it, the backend falls back to `find_one({"status": "active"})` which is ambiguous when multiple shifts are active.
+- `start_shift` looks for `status: "ended"` when finding the previous shift for carry-over — intentional, the previous person ends their shift before the new person starts.
+- `formatTimestamp` guards with `isNaN(d.getTime())` — null/missing timestamps must not render "Invalid Date".
 - The board columns use CSS `flex: 1; height: 100%` — do not add `overflow: visible` or the column scroll breaks.
+- `carried_over_from` uses `task.get("carried_over_from") or prev_shift.get("on_call_person", "")` — the `or` is intentional to preserve the original creator across chains.
